@@ -1,12 +1,13 @@
 #define WIFI_NAME "MyRobot"
-#define WIFI_PASSWORD "11117771111"
+#define WIFI_PASSWORD "7771111777"
 
 #define DEVICE_NAME "ZAR"
 
-#define SERVER_IP "192.168.1.82"
+#define SERVER_IP "192.168.5.115"
 #define SERVER_PORT 1234
 
 #define ENABLE_AVOCADO_ESP_WIFI_MONITOR
+#define ENABLE_AVOCADO_ESP_WIFI_BOOT
 
 #include <AVOCADO_esp.h>
 
@@ -46,6 +47,7 @@ long current_millis = 0;  // текущие millis() для сравнения
 
 int mode = 0;
 bool f = false;
+int c;
 
 void setup() {
 
@@ -79,34 +81,124 @@ void loop() {
     if (input_data == "1") {
       mode = 1;
     }
-  }
-  if (mode == 1) {
-    for (int i = 130; i < 230; ++i) {
-      if (lidar_data[i] < 1000 and lidar_data[i] != 0) {
-        f = true;
-      } else {
-        f = false;
-      }
-      esp.update();
+    if (input_data == "2") {
+      mode = 2;
     }
-    if (f == true) {
-      int c = millis();
-      while (millis() < c + 2000) {
+  }
+  if (mode == 2) {
+    digitalWrite(CH1L, HIGH);
+    digitalWrite(CH2L, LOW);
+
+    digitalWrite(CH1R, HIGH);
+    digitalWrite(CH2R, LOW);
+
+    analogWrite(PWML, 70);
+    analogWrite(PWMR, 70);
+  }
+
+  for (int i = 170; i < 190; ++i) {
+    if (lidar_data[i] < 1000 and lidar_data[i] != 0) {
+      // esp.print(String(lidar_data[i]) + " " + String(i));
+      f = true;
+      // esp.print("1");
+      // c = millis();
+      // k = i;
+      while (lidar_data[i] < 1000) {
         analogWrite(PWML, 0);
         analogWrite(PWMR, 0);
+        esp.print(String(lidar_data[i]) + " " + String(i));
         esp.update();
+
+        while (Serial2.available()) {
+
+          // читаем стартовый байт пакета
+          if (Serial2.read() == (raw_data[0] = FRAME_HEADER)) {
+            for (int i = 1; i != 256; i++) {
+
+              // заполняем буфер
+              raw_data[i] = Serial2.read();
+            }
+          }
+          esp.update();
+        }
+
+        // если байт указывающий на данные совпадает с заголовком пакета
+        if (raw_data[DATA_START_BYTE] == DATA_HEADER) {
+
+          // берем длинну полезных данных (2-й и 3-й байт сырых данных)
+          uint16_t raw_data_length = (raw_data[SIZE_HI_BYTE] << 8) + raw_data[SIZE_LO_BYTE];
+
+          // берем контрольную сумму из сырых данных
+          uint16_t checksum = (raw_data[raw_data_length] << 8) + raw_data[raw_data_length + 1];
+          delay(5);
+
+          // вызываем функцию подсчета контрольной суммы
+          if (checksum == checksum_cmp(raw_data, raw_data_length)) {  // если сумма прошла
+
+            // подсчет стартового угла данного пакета
+            float start_angle = ((raw_data[START_ANGLE_HI_BYTE] << 8)
+                                 + raw_data[START_ANGLE_LO_BYTE])
+                                * 0.01;
+
+            // подсчет кол-ва проб расстояния: кол-во проб = (размер данных расстояния - 5) /  3
+            uint8_t read_count = (raw_data[DISTANCE_DATA_SYZE] - 5) / 3;
+            for (int n = 0; n < read_count; n++) {
+
+              // подсчет угла каждой пробы:
+              // угол = стартовый угол + 22,5° * (номер пробы - 1)/ кол-во проб
+              float angle = start_angle + 22.5 * (n - 1) / read_count;
+
+              // итератор для массива lidar_data
+              int i = int(angle);
+
+              // подсчет расстояния
+              float distance = ((raw_data[FIRST_DIST_HI_BYTE + n * 3] << 8)
+                                + raw_data[FIRST_DIST_LO_BYTE + n * 3])
+                               * 0.25;
+
+              // запись расстояния в массив
+              lidar_data[i] = distance;
+            }
+          }
+          data_ready = true;
+        }
       }
     } else {
-      analogWrite(PWML, 60);
-      analogWrite(PWMR, 60);
-      esp.update();
+      // if (millis() > c + 500) {
+      f = false;
+      // esp.print("0");
+      // }
     }
+    // esp.update();
   }
+  if (f == true) {
+    if (mode == 1) {
+      // int c = millis();
+      // while (millis() < c + 2000) {
+      analogWrite(PWML, 0);
+      analogWrite(PWMR, 0);
+      // esp.update();
+      // }
+    }
+  } else {
+    go();
+    // esp.update();
+  }
+
   if (mode == 0) {
     analogWrite(PWML, 0);
     analogWrite(PWMR, 0);
-    esp.update();
+    // esp.update();
   }
+  // for (int i = 268; i < 272; ++i) {
+  //   if (lidar_data[i] != 0) {
+  //     float p = 70 - lidar_data[i];
+
+  //     float PID = p * 0.01;
+
+  //     esp.print(String(PID) + " " + String(p) + " " + String(lidar_data[i]));
+  //   }
+  // }
 
   // если прошёл интервал ожидания и данные готовы
 
@@ -133,7 +225,7 @@ void loop() {
 
     // берем контрольную сумму из сырых данных
     uint16_t checksum = (raw_data[raw_data_length] << 8) + raw_data[raw_data_length + 1];
-    delay(10);
+    delay(5);
 
     // вызываем функцию подсчета контрольной суммы
     if (checksum == checksum_cmp(raw_data, raw_data_length)) {  // если сумма прошла

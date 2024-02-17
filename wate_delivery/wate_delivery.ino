@@ -13,6 +13,8 @@
 
 AVOCADO_esp esp;
 
+float eold = 0;
+
 
 #define FRAME_HEADER 0XAA       // определяем заголовок пакета
 #define DATA_HEADER 0xAD        // определяем значение байта начала данных
@@ -63,10 +65,17 @@ void setup() {
   pinMode(CH1R, OUTPUT);
   pinMode(CH2R, OUTPUT);
 
+  pinMode(ACT1, OUTPUT);
+  pinMode(ACT2, OUTPUT);
+
+  pinMode(PWMACT, OUTPUT);
+  // pinMode(CH2R, OUTPUT);
+
   esp.setup();
 }
 
 void loop() {
+  esp.update();
   digitalWrite(CH1L, LOW);
   digitalWrite(CH2L, HIGH);
 
@@ -84,7 +93,36 @@ void loop() {
     if (input_data == "2") {
       mode = 2;
     }
+    if (input_data == "3"){
+      mode = 3;
+    }
+    if (input_data == "4"){
+      mode = 4;
+    }
   }
+  if (mode == 4) {
+    digitalWrite(ACT1, LOW);
+    digitalWrite(ACT2, HIGH);
+
+    // digitalWrite(CH1R, HIGH);
+    // digitalWrite(CH2R, LOW);
+
+    analogWrite(PWMACT, 200);
+    esp.print("ACT");
+    esp.update();
+  }
+  if (mode == 3) {
+    digitalWrite(ACT1, HIGH);
+    digitalWrite(ACT2, LOW);
+
+    // digitalWrite(CH1R, HIGH);
+    // digitalWrite(CH2R, LOW);
+
+    analogWrite(PWMACT, 200);
+    esp.print("ACT");
+    esp.update();
+  }
+
   if (mode == 2) {
     digitalWrite(CH1L, HIGH);
     digitalWrite(CH2L, LOW);
@@ -97,13 +135,13 @@ void loop() {
   }
 
   for (int i = 170; i < 190; ++i) {
-    if (lidar_data[i] < 1000 and lidar_data[i] != 0) {
+    if (lidar_data[i] < 400 and lidar_data[i] != 0) {
       // esp.print(String(lidar_data[i]) + " " + String(i));
       f = true;
       // esp.print("1");
       // c = millis();
       // k = i;
-      while (lidar_data[i] < 1000) {
+      while (lidar_data[i] < 400) {
         analogWrite(PWML, 0);
         analogWrite(PWMR, 0);
         esp.print(String(lidar_data[i]) + " " + String(i));

@@ -15,6 +15,9 @@ AVOCADO_esp esp;
 
 float eold = 0;
 
+int c = 0;
+int mils = 0;
+
 
 #define FRAME_HEADER 0XAA       // определяем заголовок пакета
 #define DATA_HEADER 0xAD        // определяем значение байта начала данных
@@ -43,13 +46,15 @@ long current_millis = 0;  // текущие millis() для сравнения
 #define CH1R 26
 #define CH2R 27
 
+bool milflag = 0;
+
 #define PWMACT 21
 #define ACT1 23
 #define ACT2 22
 
 int mode = 0;
 bool f = false;
-int c;
+// int c;
 
 void setup() {
 
@@ -86,17 +91,21 @@ void loop() {
     String input_data = esp.read();
     if (input_data == "0") {
       mode = 0;
+      analogWrite(PWMACT, 0);
     }
     if (input_data == "1") {
       mode = 1;
+      analogWrite(PWMACT, 0);
+      c = millis();
     }
     if (input_data == "2") {
       mode = 2;
+      analogWrite(PWMACT, 0);
     }
-    if (input_data == "3"){
+    if (input_data == "3") {
       mode = 3;
     }
-    if (input_data == "4"){
+    if (input_data == "4") {
       mode = 4;
     }
   }
@@ -138,6 +147,7 @@ void loop() {
     if (lidar_data[i] < 400 and lidar_data[i] != 0) {
       // esp.print(String(lidar_data[i]) + " " + String(i));
       f = true;
+      mils = millis();
       // esp.print("1");
       // c = millis();
       // k = i;
@@ -201,6 +211,7 @@ void loop() {
           data_ready = true;
         }
       }
+      mils = millis() - mils;
     } else {
       // if (millis() > c + 500) {
       f = false;
@@ -219,9 +230,44 @@ void loop() {
       // }
     }
   } else {
-    go();
+    if (mils + millis() < c + 8000 + mils) {
+      go();
+      milflag = 1;
+    } else {
+      if (milflag == 1) {
+        analogWrite(PWML, 0);
+        analogWrite(PWMR, 0);
+        milflag = 2;
+      }
+    }
     // esp.update();
   }
+  // if (milflag == 2) {
+  //   digitalWrite(CH1L, HIGH);
+  //   digitalWrite(CH2L, LOW);
+
+  //   digitalWrite(CH1R, LOW);
+  //   digitalWrite(CH2R, HIGH);
+
+  //   analogWrite(PWML, 70);
+  //   analogWrite(PWMR, 70);
+    
+  //   delay(2000);
+
+  //   digitalWrite(CH1L, HIGH);
+  //   digitalWrite(CH2L, LOW);
+
+  //   digitalWrite(CH1R, HIGH);
+  //   digitalWrite(CH2R, LOW);
+
+  //   analogWrite(PWML, 70);
+  //   analogWrite(PWMR, 70);
+    
+  //   delay(3000);
+    
+  //   analogWrite(PWML, 0);
+  //   analogWrite(PWMR, 0);
+  // }
 
   if (mode == 0) {
     analogWrite(PWML, 0);
